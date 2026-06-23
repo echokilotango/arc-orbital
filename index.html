@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ARC — Astrodynamics & Relativistic Computing</title>
+<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+  }
+}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;color:#dde6f0;
+  font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+#app{display:flex;width:100vw;height:100vh}
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%!important;height:100%!important}
+
+/* ── SIDEBAR ── */
+#sidebar{
+  width:290px;min-width:290px;height:100vh;overflow-y:auto;
+  background:rgba(6,9,16,0.97);
+  border-left:1px solid rgba(255,255,255,0.05);
+  display:flex;flex-direction:column;
+}
+#sidebar::-webkit-scrollbar{width:3px}
+#sidebar::-webkit-scrollbar-thumb{background:#1a2a3a;border-radius:2px}
+
+.sb-header{
+  padding:18px 18px 12px;
+  background:linear-gradient(180deg,rgba(10,20,40,0.9),transparent);
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.arc-logo{display:flex;align-items:center;gap:10px}
+.arc-icon{
+  width:34px;height:34px;border-radius:8px;
+  background:linear-gradient(135deg,#0d3a6e,#0a5f8a);
+  border:1px solid rgba(60,160,220,0.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;box-shadow:0 0 18px rgba(40,140,220,0.3)
+}
+.arc-title{font-size:18px;font-weight:800;letter-spacing:0.06em;color:#e8f4ff}
+.arc-sub{font-size:9px;color:#6a9ab0;letter-spacing:0.14em;margin-top:1px}
+
+.sb-block{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-label{font-size:9px;font-weight:700;letter-spacing:0.16em;color:#5ab0d0;
+  text-transform:uppercase;margin-bottom:8px}
+
+/* select */
+.sel-wrap{position:relative}
+.sel-wrap select{
+  width:100%;padding:7px 28px 7px 10px;
+  background:rgba(12,20,35,0.9);border:1px solid rgba(255,255,255,0.15);
+  border-radius:5px;color:#d0e8f8;font-size:12px;appearance:none;cursor:pointer;outline:none
+}
+.sel-wrap select:focus{border-color:#4ab0e0}
+.sel-wrap::after{content:'▾';position:absolute;right:9px;top:50%;transform:translateY(-50%);color:#4ab0e0;pointer-events:none}
+.orbit-note{font-size:10px;color:#7aaabb;margin-top:5px;line-height:1.45}
+
+/* orbit count */
+.count-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.count-row input[type=range]{flex:1}
+.count-val{font-size:11px;color:#4ad0f0;min-width:14px;text-align:center;font-weight:700}
+
+/* param rows */
+.param{margin-bottom:10px}
+.param-top{display:flex;align-items:baseline;gap:5px;margin-bottom:3px}
+.p-sym{font-size:14px;color:#90ccee;font-style:italic;min-width:14px}
+.p-name{font-size:10px;color:#88aac0;flex:1}
+.p-unit{font-size:9px;color:#6a8898}
+.param-ctrl{display:flex;align-items:center;gap:5px}
+.param-ctrl input[type=range]{flex:1;height:2px}
+.param-ctrl input[type=number]{
+  width:68px;padding:3px 5px;background:rgba(10,18,30,0.95);
+  border:1px solid rgba(255,255,255,0.12);border-radius:4px;
+  color:#c0ddf0;font-size:11px;text-align:right;outline:none
+}
+.param-ctrl input[type=number]:focus{border-color:#4ab0e0}
+
+/* live-updating nu field highlight */
+#in-nu.live-update, #sl-nu.live-update {
+  border-color: rgba(57,255,136,0.5) !important;
+}
+#in-nu {
+  transition: border-color 0.3s ease;
+}
+
+/* range track */
+input[type=range]{-webkit-appearance:none;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{
+  height:2px;border-radius:1px;background:linear-gradient(to right,#0d3a60,#071828)
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+  background:#2ab0e0;margin-top:-4.5px;box-shadow:0 0 6px #2af5;transition:background .15s
+}
+input[type=range]::-webkit-slider-thumb:hover{background:#50d0ff}
+
+/* force toggles */
+.force-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-bottom:6px}
+.f-item{display:flex;align-items:center;gap:5px;padding:2px 0}
+.f-item input{accent-color:#2ab0e0;cursor:pointer}
+.f-item label{font-size:11px;color:#90b8cc;cursor:pointer;transition:color .15s}
+.f-item label:hover{color:#c0e0f8}
+
+/* sc grid */
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;margin-top:5px}
+.sc-item label{display:block;font-size:9px;color:#7aaabb;margin-bottom:2px}
+.sc-item input{width:100%;padding:3px 5px;background:rgba(10,18,30,0.9);
+  border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:#b0cce0;font-size:11px;outline:none}
+
+/* GR amp */
+.gr-row{margin-top:7px}
+.gr-top{display:flex;justify-content:space-between;font-size:9px;color:#7aaabb;margin-bottom:3px}
+#gr-amp-lbl{color:#f0a040;font-weight:700}
+.gr-note{font-size:9px;color:#6a8898;margin-top:2px;line-height:1.3}
+
+/* datetime */
+.dt-row{display:flex;gap:5px}
+.dt-row input{
+  flex:1;padding:5px 6px;background:rgba(10,18,30,0.9);
+  border:1px solid rgba(255,255,255,0.06);border-radius:4px;
+  color:#a0c0dc;font-size:11px;outline:none
+}
+
+/* PROPAGATE */
+#btn-prop{
+  margin:12px 16px;padding:10px;
+  background:linear-gradient(135deg,#082840,#041828);
+  border:1px solid rgba(40,140,200,0.3);border-radius:6px;
+  color:#2ab0e0;font-size:12px;font-weight:700;letter-spacing:0.1em;
+  cursor:pointer;text-transform:uppercase;transition:all .2s;width:calc(100% - 32px)
+}
+#btn-prop:hover{border-color:#2ab0e0;box-shadow:0 0 18px rgba(40,160,220,0.2)}
+#btn-prop:disabled{opacity:.35;cursor:wait}
+
+/* ── OVERLAY UI ── */
+#metrics{
+  position:absolute;top:12px;left:12px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;pointer-events:none;z-index:5
+}
+.mc{
+  background:rgba(5,10,20,0.82);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;padding:8px 12px;backdrop-filter:blur(10px);min-width:90px
+}
+.mc-lbl{font-size:9px;color:#6ab0c8;letter-spacing:.1em;text-transform:uppercase}
+.mc-val{font-size:15px;font-weight:700;color:#39ff88;margin-top:1px}
+.mc-unit{font-size:9px;color:#6a8898;margin-left:1px}
+
+#ecl-badge{
+  position:absolute;top:12px;right:12px;
+  background:rgba(5,10,20,0.85);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;padding:8px 12px;backdrop-filter:blur(10px);
+  font-size:11px;z-index:5;display:none
+}
+.eb-lbl{font-size:9px;color:#6ab0c8;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+#ecl-ind{font-weight:700;font-size:12px}
+.sunlit{color:#f0c040}.in-shadow{color:#8040b0}
+
+#j2bar{
+  position:absolute;bottom:52px;left:12px;
+  background:rgba(5,10,20,0.82);border:1px solid rgba(255,255,255,0.05);
+  border-radius:6px;padding:7px 12px;backdrop-filter:blur(10px);
+  font-size:10px;color:#2a5060;z-index:5;line-height:1.8
+}
+
+#geo-banner{
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
+  background:rgba(20,8,40,0.92);border:1px solid #5030a0;
+  border-radius:6px;padding:7px 14px;z-index:5;
+  font-size:11px;color:#a070e0;text-align:center;display:none;pointer-events:none
+}
+
+/* ANIM BAR */
+#anim-bar{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:10px;
+  background:rgba(5,10,20,0.88);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:8px 14px;backdrop-filter:blur(10px);z-index:5
+}
+#btn-play{
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(15,35,60,0.9);border:1px solid #1a5070;
+  color:#2ab0e0;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .2s
+}
+#btn-play:hover{box-shadow:0 0 10px rgba(40,160,220,0.4)}
+#timeline{width:200px;height:2px;cursor:pointer;accent-color:#2ab0e0}
+#t-lbl{font-size:10px;color:#2a5060;min-width:34px;text-align:right}
+
+/* PERTURB */
+#perturb-btn{
+  position:absolute;right:12px;bottom:58px;
+  background:rgba(5,12,25,0.92);border:1px solid rgba(42,176,224,0.25);
+  border-radius:6px;padding:6px 13px;color:#2a8aaa;font-size:11px;font-weight:600;
+  cursor:pointer;z-index:5;transition:all .2s;letter-spacing:0.04em;
+  backdrop-filter:blur(8px);
+}
+#perturb-btn:hover{color:#2ab0e0;border-color:rgba(42,176,224,0.55);box-shadow:0 0 10px rgba(42,176,224,0.15)}
+#perturb-btn.open{color:#39ffcc;border-color:rgba(57,255,204,0.4);background:rgba(5,18,30,0.95)}
+#perturb-panel{
+  position:absolute;right:12px;bottom:90px;
+  background:rgba(5,10,20,0.92);border:1px solid rgba(255,255,255,0.05);
+  border-radius:6px;padding:10px 13px;backdrop-filter:blur(10px);
+  z-index:5;font-size:10px;color:#2a5060;display:none;min-width:270px
+}
+.pt-hdr{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#2a5060;margin-bottom:6px}
+.pt-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0;
+  border-bottom:1px solid rgba(255,255,255,0.02)}
+.pt-n{color:#4a7090}.pt-v{color:#39ff88;font-family:monospace}.pt-r{color:#2a4050;font-family:monospace}
+
+/* LOADING */
+#loading{
+  position:absolute;inset:0;background:rgba(0,0,0,.75);
+  display:none;align-items:center;justify-content:center;
+  z-index:20;flex-direction:column;gap:10px
+}
+.spin{width:32px;height:32px;border:2px solid #0a2030;border-top-color:#2ab0e0;
+  border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.spin-lbl{font-size:11px;color:#2a5060;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-wrap">
+    <canvas id="gl"></canvas>
+
+    <div id="metrics">
+      <div class="mc"><div class="mc-lbl">Period</div><div class="mc-val" id="m-period">—<span class="mc-unit">hr</span></div></div>
+      <div class="mc"><div class="mc-lbl">Speed</div><div class="mc-val" id="m-speed">—<span class="mc-unit">km/s</span></div></div>
+      <div class="mc"><div class="mc-lbl">Apogee</div><div class="mc-val" id="m-apogee">—<span class="mc-unit">km</span></div></div>
+      <div class="mc"><div class="mc-lbl">Perigee</div><div class="mc-val" id="m-perigee">—<span class="mc-unit">km</span></div></div>
+      <div class="mc"><div class="mc-lbl">Orbit</div><div class="mc-val" id="m-type" style="font-size:12px">—</div></div>
+      <div class="mc"><div class="mc-lbl">Eclipse</div><div class="mc-val" id="m-ecl">—<span class="mc-unit">%</span></div></div>
+    </div>
+
+    <div id="ecl-badge"><div class="eb-lbl">Eclipse Status</div><div id="ecl-ind">—</div></div>
+    <div id="j2bar">
+      J₂ Ω̇: <span id="j2-raan" style="color:#2ab0e0">—</span> °/day &nbsp;|&nbsp;
+      J₂ ω̇: <span id="j2-aop"  style="color:#2ab0e0">—</span> °/day
+    </div>
+    <div id="geo-banner"></div>
+
+    <div id="anim-bar">
+      <button id="btn-play">▶</button>
+      <input type="range" id="timeline" min="0" max="100" value="0"/>
+      <span id="t-lbl">0%</span>
+    </div>
+
+    <button id="perturb-btn">📊 Perturbations</button>
+    <div id="perturb-panel">
+      <div class="pt-hdr" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Force magnitudes at t₀ &nbsp;(m/s²)</span>
+        <button id="perturb-close" style="background:none;border:none;color:#2a7090;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Close">✕</button>
+      </div>
+      <div id="pt-rows"></div>
+    </div>
+
+    <div id="loading"><div class="spin"></div><div class="spin-lbl">PROPAGATING…</div></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-header">
+      <div class="arc-logo">
+        <div class="arc-icon">⬡</div>
+        <div>
+          <div class="arc-title">ARC</div>
+          <div class="arc-sub">Astrodynamics &amp; Relativistic Computing</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-label">Orbit Type</div>
+      <div class="sel-wrap">
+        <select id="orbit-sel">
+          {% for name in presets %}<option value="{{name}}">{{name}}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="orbit-note" id="orbit-note"></div>
+      <div style="margin-top:9px">
+        <div class="sb-label" style="margin-bottom:5px">Ground Track Orbits</div>
+        <div class="count-row">
+          <input type="range" id="n-orb" min="1" max="6" value="2" step="1"/>
+          <span class="count-val" id="n-orb-v">2</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-label">Orbital Elements</div>
+
+      <div class="param">
+        <div class="param-top"><span class="p-sym">a</span><span class="p-name">Semi-Major Axis</span><span class="p-unit">km</span></div>
+        <div class="param-ctrl"><input type="range" id="sl-a" min="6500" max="45000" step="1" value="6778"/><input type="number" id="in-a" min="6500" max="45000" step="1" value="6778"/></div>
+      </div>
+      <div class="param">
+        <div class="param-top"><span class="p-sym">e</span><span class="p-name">Eccentricity</span></div>
+        <div class="param-ctrl"><input type="range" id="sl-e" min="0" max="0.95" step="0.001" value="0.001"/><input type="number" id="in-e" min="0" max="0.95" step="0.001" value="0.001"/></div>
+      </div>
+      <div class="param">
+        <div class="param-top"><span class="p-sym">i</span><span class="p-name">Inclination</span><span class="p-unit">deg</span></div>
+        <div class="param-ctrl"><input type="range" id="sl-i" min="0" max="180" step="0.1" value="51.6"/><input type="number" id="in-i" min="0" max="180" step="0.1" value="51.6"/></div>
+      </div>
+      <div class="param">
+        <div class="param-top"><span class="p-sym">Ω</span><span class="p-name">RAAN</span><span class="p-unit">deg</span></div>
+        <div class="param-ctrl"><input type="range" id="sl-raan" min="0" max="360" step="0.1" value="0"/><input type="number" id="in-raan" min="0" max="360" step="0.1" value="0"/></div>
+      </div>
+      <div class="param">
+        <div class="param-top"><span class="p-sym">ω</span><span class="p-name">Arg. of Perigee</span><span class="p-unit">deg</span></div>
+        <div class="param-ctrl"><input type="range" id="sl-aop" min="0" max="360" step="0.1" value="0"/><input type="number" id="in-aop" min="0" max="360" step="0.1" value="0"/></div>
+      </div>
+      <div class="param">
+        <div class="param-top">
+          <span class="p-sym">θ</span>
+          <span class="p-name">True Anomaly</span>
+          <span class="p-unit">deg</span>
+          <!-- live indicator dot -->
+          <span id="nu-live-dot" style="display:none;width:6px;height:6px;border-radius:50%;
+            background:#39ff88;box-shadow:0 0 5px #39ff88;margin-left:4px;flex-shrink:0;align-self:center"></span>
+        </div>
+        <div class="param-ctrl">
+          <input type="range" id="sl-nu" min="0" max="360" step="0.1" value="0"/>
+          <input type="number" id="in-nu" min="0" max="360" step="0.1" value="0"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-label">Perturbation Forces</div>
+      <div class="force-grid">
+        <label class="f-item"><input type="checkbox" id="f-j2" checked/><label for="f-j2">J₂ Oblateness</label></label>
+        <label class="f-item"><input type="checkbox" id="f-drag" checked/><label for="f-drag">Atm. Drag</label></label>
+        <label class="f-item"><input type="checkbox" id="f-sun" checked/><label for="f-sun">Sun Gravity</label></label>
+        <label class="f-item"><input type="checkbox" id="f-moon" checked/><label for="f-moon">Moon Gravity</label></label>
+        <label class="f-item"><input type="checkbox" id="f-srp" checked/><label for="f-srp">Solar Rad. Press.</label></label>
+        <label class="f-item"><input type="checkbox" id="f-gr" checked/><label for="f-gr">GR Schwarzschild</label></label>
+        <label class="f-item"><input type="checkbox" id="f-lt"/><label for="f-lt">Lense-Thirring</label></label>
+      </div>
+      <div class="sb-label" style="margin-top:6px">Spacecraft</div>
+      <div class="sc-grid">
+        <div class="sc-item"><label>Cd (drag coeff)</label><input type="number" id="sc-Cd" value="2.2" step="0.05" min="1.5" max="3"/></div>
+        <div class="sc-item"><label>A/m drag (m²/kg)</label><input type="number" id="sc-amd" value="0.01" step="0.001" min="0.001" max="0.5"/></div>
+        <div class="sc-item"><label>Cr (reflectivity)</label><input type="number" id="sc-Cr" value="1.3" step="0.05" min="1" max="2"/></div>
+        <div class="sc-item"><label>A/m SRP (m²/kg)</label><input type="number" id="sc-ams" value="0.02" step="0.001" min="0.001" max="0.5"/></div>
+      </div>
+      <div class="gr-row">
+        <div class="gr-top"><span>GR Amplification</span><span id="gr-amp-lbl">×1</span></div>
+        <input type="range" id="gr-amp" min="0" max="8" step="1" value="0"/>
+        <div class="gr-note">Real effect ~10⁻¹⁰ — increase to visualise precession</div>
+      </div>
+    </div>
+
+    <div class="sb-block">
+      <div class="sb-label">Date / Time (UTC)</div>
+      <div class="dt-row">
+        <input type="date" id="dt-date" value="2026-03-20"/>
+        <input type="time" id="dt-time" value="00:00"/>
+      </div>
+    </div>
+
+    <button id="btn-prop">▶ &nbsp;Propagate Orbit</button>
+  </div>
+</div>
+
+<script>
+const PRESETS = {{ presets | tojson }};
+const orbitSel = document.getElementById('orbit-sel');
+const orbitNote= document.getElementById('orbit-note');
+const nOrb     = document.getElementById('n-orb');
+const nOrbV    = document.getElementById('n-orb-v');
+const grAmp    = document.getElementById('gr-amp');
+const grLbl    = document.getElementById('gr-amp-lbl');
+const nuLiveDot = document.getElementById('nu-live-dot');
+
+const PARAMS = ['a','e','i','raan','aop','nu'];
+const sl={}, inp={};
+PARAMS.forEach(p=>{
+  sl[p]  = document.getElementById('sl-'+p);
+  inp[p] = document.getElementById('in-'+p);
+  sl[p].addEventListener('input',()=>{ inp[p].value=sl[p].value; });
+  inp[p].addEventListener('input',()=>{ sl[p].value=inp[p].value; });
+});
+nOrb.addEventListener('input',()=>{ nOrbV.textContent=nOrb.value; });
+grAmp.addEventListener('input',()=>{
+  const v=Math.pow(10,parseInt(grAmp.value));
+  grLbl.textContent='×'+(v>=1000?v.toExponential(0):v);
+});
+
+// ── FIX 1: Presets load defaults but ALL sliders stay editable ──
+function loadPreset(name){
+  const p=PRESETS[name]; if(!p) return;
+  PARAMS.forEach(k=>{
+    if(p[k]!==undefined){
+      sl[k].value=p[k];
+      inp[k].value=p[k];
+    }
+    // Always enable — never lock any preset
+    sl[k].disabled=false;
+    inp[k].disabled=false;
+  });
+  orbitNote.textContent=p.note||'';
+}
+orbitSel.addEventListener('change',()=>loadPreset(orbitSel.value));
+loadPreset('LEO');
+
+document.getElementById('btn-prop').addEventListener('click', propagate);
+
+// Storage for per-step true anomaly values returned by backend
+let trueAnomalyArr = [];
+
+async function propagate(){
+  const btn=document.getElementById('btn-prop');
+  const ld=document.getElementById('loading');
+  btn.disabled=true; ld.style.display='flex';
+  const amp=Math.pow(10,parseInt(grAmp.value));
+  const payload={
+    a:+inp.a.value, e:+inp.e.value, i:+inp.i.value,
+    raan:+inp.raan.value, aop:+inp.aop.value, nu:+inp.nu.value,
+    n_orbits:+nOrb.value, gr_amp:amp,
+    j2:document.getElementById('f-j2').checked,
+    drag:document.getElementById('f-drag').checked,
+    sun:document.getElementById('f-sun').checked,
+    moon:document.getElementById('f-moon').checked,
+    srp:document.getElementById('f-srp').checked,
+    gr:document.getElementById('f-gr').checked,
+    lt:document.getElementById('f-lt').checked,
+    Cd:+document.getElementById('sc-Cd').value,
+    Am_drag:+document.getElementById('sc-amd').value,
+    Cr:+document.getElementById('sc-Cr').value,
+    Am_srp:+document.getElementById('sc-ams').value,
+    datetime:document.getElementById('dt-date').value+'T'+document.getElementById('dt-time').value+':00',
+  };
+  try{
+    const r=await fetch('/api/propagate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+
+    // Store true anomaly array for live update
+    trueAnomalyArr = d.true_anomaly_deg || [];
+
+    document.getElementById('m-period').innerHTML=d.period_hr+'<span class="mc-unit"> hr</span>';
+    document.getElementById('m-speed').innerHTML=d.speed_kms+'<span class="mc-unit"> km/s</span>';
+    document.getElementById('m-apogee').innerHTML=d.apogee_km.toLocaleString()+'<span class="mc-unit"> km</span>';
+    document.getElementById('m-perigee').innerHTML=d.perigee_km.toLocaleString()+'<span class="mc-unit"> km</span>';
+    document.getElementById('m-type').textContent=orbitSel.value;
+    const ep=(d.eclipse.filter(Boolean).length/d.eclipse.length*100).toFixed(1);
+    document.getElementById('m-ecl').innerHTML=ep+'<span class="mc-unit"> %</span>';
+    document.getElementById('j2-raan').textContent=d.raan_rate.toFixed(4);
+    document.getElementById('j2-aop').textContent=d.aop_rate.toFixed(4);
+    const eb=document.getElementById('ecl-badge'); eb.style.display='block';
+    const ei=document.getElementById('ecl-ind');
+    ei.textContent=d.eclipse[0]?'🌑  In Shadow':'☀️  Sunlit';
+    ei.className=d.eclipse[0]?'in-shadow':'sunlit';
+    const gb=document.getElementById('geo-banner');
+    if(orbitSel.value==='GEO'){
+      gb.style.display='block';
+      if(d.geo_eclipse_possible){
+        gb.style.borderColor='#5030a0'; gb.style.color='#a070e0';
+        gb.innerHTML=`🌑 Eclipse season — Sun decl. ${d.sun_decl}° within ±${d.geo_limit}°`;
+      } else {
+        gb.style.borderColor='#0a3040'; gb.style.color='#2a6060';
+        gb.innerHTML=`☀️ No eclipses — Sun decl. ${d.sun_decl}° outside ±${d.geo_limit}°`;
+      }
+    } else gb.style.display='none';
+    document.getElementById('pt-rows').innerHTML=d.perturb_table.map(r=>
+      `<div class="pt-row"><span class="pt-n">${r.name}</span><span class="pt-v">${r.mag.toExponential(3)}</span><span class="pt-r">${r.rel.toExponential(2)}</span></div>`
+    ).join('');
+
+    // Show live dot on θ label — indicates live updating active
+    nuLiveDot.style.display = trueAnomalyArr.length ? 'inline-block' : 'none';
+
+    window.dispatchEvent(new CustomEvent('orbitData',{detail:d}));
+  } catch(err){
+    alert('Error: is Flask running?\n'+err);
+  } finally{ btn.disabled=false; ld.style.display='none'; }
+}
+
+// ── FIX 2: Live θ update — called from main.js moveSat hook ──
+// main.js calls window.updateNuDisplay(index) after each frame
+window.updateNuDisplay = function(idx) {
+  if (!trueAnomalyArr.length) return;
+  const ci = Math.max(0, Math.min(Math.floor(idx), trueAnomalyArr.length - 1));
+  const nu = trueAnomalyArr[ci];
+  if (nu === undefined) return;
+  const rounded = Math.round(nu * 10) / 10;   // 1 decimal place
+  sl['nu'].value  = rounded;
+  inp['nu'].value = rounded.toFixed(1);
+};
+
+document.getElementById('perturb-btn').addEventListener('click',()=>{
+  const p=document.getElementById('perturb-panel');
+  const btn=document.getElementById('perturb-btn');
+  const open=p.style.display==='block';
+  p.style.display=open?'none':'block';
+  btn.textContent=open?'📊 Perturbations':'✕ Close Panel';
+  btn.classList.toggle('open',!open);
+});
+
+document.getElementById('perturb-close').addEventListener('click',()=>{
+  document.getElementById('perturb-panel').style.display='none';
+  const btn=document.getElementById('perturb-btn');
+  btn.textContent='📊 Perturbations';
+  btn.classList.remove('open');
+});
+
+window.addEventListener('load',()=>setTimeout(propagate,600));
+</script>
+<script type="module" src="/static/main.js"></script>
+</body>
+</html>
