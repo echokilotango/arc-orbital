@@ -136,10 +136,10 @@ const txLoader  = new THREE.TextureLoader();
 
 // High-res textures from NASA/three-globe CDN
 const TEX = {
-  day:   '/static/img/earth-day.jpg',
-  night: '/static/img/earth-night.jpg',
-  spec:  '/static/img/earth-water.png',
-  cloud: '/static/img/earth-clouds.png',
+  day:   'https://unpkg.com/three-globe/example/img/earth-day.jpg',
+  night: 'https://unpkg.com/three-globe/example/img/earth-night.jpg',
+  spec:  'https://unpkg.com/three-globe/example/img/earth-water.png',
+  cloud: 'https://unpkg.com/three-globe/example/img/earth-clouds.png',
 };
 
 // Create 1x1 placeholder textures so shader never samples null
